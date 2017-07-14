@@ -1,0 +1,85 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no  
+  tasks:
+    - block:
+      - name: check current subscription-manager status
+        shell: >
+          subscription-manager status | grep "Overall Status" | awk '{ print $3 }'
+        register: subman_status
+  
+      - set_fact: 
+          status_before: "{{ subman_status.stdout_lines }}"
+  
+      - name: check current products
+        shell: >
+          subscription-manager list | grep "Product Name"
+        register: subman_products
+  
+      - set_fact:
+          products_before: "{{ subman_products.stdout_lines }}"
+         
+  
+      - name: check subscription-manager repos --list-enabled
+        shell: >
+          subscription-manager repos --list-enabled | grep "Repo ID" | awk '{ print $3 }'
+        register: subman_repos
+  
+      - set_fact:
+          repos_before: "{{ subman_repos.stdout_lines }}"
+
+  
+      - debug:
+          msg: "{{ item }}"
+        with_items: "{{ repos_before }}"
+  
+      - debug:
+          msg: "{{ products_before }}"
+
+    - block:
+      - name:  remove a repo
+        shell: >
+          subscription-manager repos --disable "{{ repos_before.1 }}"
+
+    - block:
+      - name: check current subscription-manager status
+        shell: >
+          subscription-manager status | grep "Overall Status" | awk '{ print $3 }'
+        register: subman_status
+  
+      - set_fact: 
+          status_after: "{{ subman_status.stdout_lines }}"
+  
+      - name: check current products
+        shell: >
+          subscription-manager list | grep "Product Name"
+        register: subman_products
+  
+      - set_fact:
+          products_after: "{{ subman_products.stdout_lines }}"
+         
+  
+      - name: check subscription-manager repos --list-enabled
+        shell: >
+          subscription-manager repos --list-enabled | grep "Repo ID" | awk '{ print $3 }'
+        register: subman_repos
+  
+      - set_fact:
+          repos_after: "{{ subman_repos.stdout_lines }}"
+  
+      - debug:
+          msg: "{{ status_after }}"
+  
+      - debug:
+          msg: "{{ repos_after }}"
+  
+      - debug:
+          msg: "{{ products_after }}"
+
+    - block:
+      - name: compare before and after
+        fail:
+          msg: "repos not the same"
+        when: item not in repos_after
+        with_items: "{{ repos_before }}"
